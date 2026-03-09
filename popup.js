@@ -178,12 +178,18 @@ async function updateUrlStatus(fieldId) {
   const status = document.getElementById(`${fieldId}-status`);
   if (!input || !status) return;
 
-  const value = input.value.trim();
+  let value = input.value.trim();
 
   if (!value) {
     status.textContent = '';
     status.className = 'url-status';
     return;
+  }
+
+  // Auto-prepend https:// when the user omits the protocol (e.g. www.linkedin.com/in/…)
+  if (!/^https?:\/\//i.test(value)) {
+    value = `https://${value}`;
+    input.value = value;
   }
 
   if (!isValidUrlFormat(value)) {
