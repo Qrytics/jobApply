@@ -130,7 +130,7 @@ function bindOpenTabButton() {
 }
 
 // ─── URL Validator ────────────────────────────────────────────────────────────
-function isValidUrl(value) {
+function isValidUrlFormat(value) {
   if (!value) return null;
   try {
     const u = new URL(value);
@@ -140,29 +140,66 @@ function isValidUrl(value) {
   }
 }
 
-function updateUrlStatus(fieldId) {
+async function isUrlReachable(url) {
+  try {
+    // mode:'no-cors' returns an opaque response when the server replies, but throws a
+    // TypeError (network/DNS error) when the domain doesn't exist — which is exactly
+    // the distinction we need to detect "gibberish" domains vs real ones.
+    await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(8000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const urlCheckTimers = {};
+
+async function updateUrlStatus(fieldId) {
   const input  = document.getElementById(fieldId);
   const status = document.getElementById(`${fieldId}-status`);
   if (!input || !status) return;
-  const valid = isValidUrl(input.value.trim());
-  if (valid === null) {
+
+  const value = input.value.trim();
+
+  if (!value) {
     status.textContent = '';
     status.className = 'url-status';
-  } else if (valid) {
-    status.textContent = '✓';
-    status.className = 'url-status valid';
-  } else {
+    return;
+  }
+
+  if (!isValidUrlFormat(value)) {
     status.textContent = '✗';
     status.className = 'url-status invalid';
+    return;
   }
+
+  status.textContent = '…';
+  status.className = 'url-status checking';
+
+  const reachable = await isUrlReachable(value);
+  // Only update if the field still has the same value (user may have kept typing)
+  if (input.value.trim() === value) {
+    if (reachable) {
+      status.textContent = '✓';
+      status.className = 'url-status valid';
+    } else {
+      status.textContent = '✗';
+      status.className = 'url-status invalid';
+    }
+  }
+}
+
+function scheduleUrlCheck(fieldId) {
+  clearTimeout(urlCheckTimers[fieldId]);
+  urlCheckTimers[fieldId] = setTimeout(() => updateUrlStatus(fieldId), 800);
 }
 
 function bindUrlValidators() {
   URL_FIELDS.forEach(id => {
     const input = document.getElementById(id);
     if (!input) return;
-    input.addEventListener('input', () => updateUrlStatus(id));
-    updateUrlStatus(id);
+    input.addEventListener('input', () => scheduleUrlCheck(id));
+    scheduleUrlCheck(id);
   });
 }
 
@@ -218,12 +255,14 @@ function bindProfileSave() {
 // ─── Repeatable sections ──────────────────────────────────────────────────────
 function bindRepeatable() {
   document.getElementById('add-experience').addEventListener('click', () => {
+    profileExperiences = collectExperiences();
     profileExperiences.push({ title: '', company: '', startDate: '', endDate: '', description: '' });
     renderExperiences();
     document.getElementById('experiences-list').lastElementChild?.scrollIntoView({ behavior: 'smooth' });
   });
 
   document.getElementById('add-project').addEventListener('click', () => {
+    profileProjects = collectProjects();
     profileProjects.push({ name: '', description: '', url: '' });
     renderProjects();
     document.getElementById('projects-list').lastElementChild?.scrollIntoView({ behavior: 'smooth' });
