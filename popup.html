@@ -17,6 +17,16 @@
       </svg>
     </div>
     <h1>jobApply</h1>
+    <div class="header-actions">
+      <button class="btn-header-icon" id="open-tab-btn" title="Open in full tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+      </button>
+      <button class="btn-header-icon btn-close" id="close-panel-btn" title="Close panel">✕</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -95,17 +105,17 @@
       <div class="section-title">Online Presence</div>
 
       <div class="form-group">
-        <label for="linkedin">LinkedIn URL</label>
+        <label for="linkedin">LinkedIn URL <span class="url-status" id="linkedin-status"></span></label>
         <input type="url" id="linkedin" placeholder="https://linkedin.com/in/janedoe" />
       </div>
 
       <div class="form-group">
-        <label for="github">GitHub URL</label>
+        <label for="github">GitHub URL <span class="url-status" id="github-status"></span></label>
         <input type="url" id="github" placeholder="https://github.com/janedoe" />
       </div>
 
       <div class="form-group">
-        <label for="website">Portfolio / Website</label>
+        <label for="website">Portfolio / Website <span class="url-status" id="website-status"></span></label>
         <input type="url" id="website" placeholder="https://janedoe.dev" />
       </div>
 
@@ -113,7 +123,7 @@
 
       <div class="form-group">
         <label for="coverLetter">Cover Letter Template</label>
-        <textarea id="coverLetter" rows="5" placeholder="Dear Hiring Manager, ..."></textarea>
+        <textarea id="coverLetter" placeholder="Dear Hiring Manager, ..."></textarea>
       </div>
 
       <div class="section-title">Work Experience</div>
@@ -141,6 +151,7 @@
     <p class="rules-intro">
       Add custom keyword rules. When a field label or placeholder on the page matches
       a keyword, jobApply will fill it with the value you provide.
+      Each rule can have multiple keywords that all map to the same response.
     </p>
 
     <div class="rules-list" id="rules-list">
@@ -154,8 +165,9 @@
       <div class="modal">
         <h3 id="modal-title">Add Rule</h3>
         <div class="form-group">
-          <label for="rule-keyword">Keyword / Phrase</label>
-          <input type="text" id="rule-keyword" placeholder="e.g. work authorization" />
+          <label>Keywords / Phrases <span class="field-hint">(press Enter or comma to add)</span></label>
+          <div id="rule-keywords-tags" class="tags-container"></div>
+          <input type="text" id="rule-keyword-input" placeholder="e.g. work authorization" autocomplete="off" />
         </div>
         <div class="form-group">
           <label for="rule-value">Response / Value</label>
@@ -192,3 +204,4 @@
   <script src="popup.js"></script>
 </body>
 </html>
+
