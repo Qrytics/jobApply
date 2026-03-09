@@ -116,6 +116,21 @@
         <textarea id="coverLetter" rows="5" placeholder="Dear Hiring Manager, ..."></textarea>
       </div>
 
+      <div class="section-title">Work Experience</div>
+      <div id="experiences-list" class="repeatable-list"></div>
+      <button type="button" class="btn-add-item" id="add-experience">+ Add Experience</button>
+
+      <div class="section-title">Projects</div>
+      <div id="projects-list" class="repeatable-list"></div>
+      <button type="button" class="btn-add-item" id="add-project">+ Add Project</button>
+
+      <div class="section-title">Skills</div>
+      <div class="form-group">
+        <label for="skill-input">Skills <span class="field-hint">(press Enter or comma to add)</span></label>
+        <div id="skills-tags" class="tags-container"></div>
+        <input type="text" id="skill-input" placeholder="e.g. JavaScript, Python, React…" autocomplete="off" />
+      </div>
+
       <button type="submit" class="btn-save" id="save-profile">Save Profile</button>
       <div id="save-status" class="save-status"></div>
     </form>
