@@ -8,13 +8,11 @@
   <!-- Apply saved theme immediately to prevent flash of wrong theme -->
   <script>
     (function () {
-      chrome.storage.local.get('uiState').then(r => {
-        const saved = (r.uiState || {}).theme;
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (saved === 'dark' || (saved === undefined && prefersDark)) {
-          document.body.classList.add('dark');
-        }
-      });
+      const saved = localStorage.getItem('jobApplyTheme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (!saved && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
     })();
   </script>
 </head>
@@ -95,6 +93,11 @@
         <input type="text" id="address" placeholder="123 Main St" />
       </div>
 
+      <div class="form-group">
+        <label for="addressLine2">Address Line 2 <span class="field-hint">(Apt, Suite, Unit…)</span></label>
+        <input type="text" id="addressLine2" placeholder="Apt 4B" />
+      </div>
+
       <div class="form-row three-col">
         <div class="form-group">
           <label for="city">City</label>
@@ -171,8 +174,10 @@
         <input type="text" id="skill-input" placeholder="e.g. JavaScript, Python, React…" autocomplete="off" />
       </div>
 
-      <button type="submit" class="btn-save" id="save-profile">Save Profile</button>
-      <div id="save-status" class="save-status"></div>
+      <div class="save-bar-sticky">
+        <button type="submit" class="btn-save" id="save-profile">Save Profile</button>
+        <div id="save-status" class="save-status"></div>
+      </div>
     </form>
   </div>
 

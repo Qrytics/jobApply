@@ -16,7 +16,7 @@ if (isTabMode) {
 // ─── Profile fields (id → storage key) ──────────────────────────────────────
 const PROFILE_FIELDS = [
   'firstName', 'lastName', 'email', 'phone',
-  'address', 'city', 'state', 'zipCode',
+  'address', 'addressLine2', 'city', 'state', 'zipCode',
   'jobTitle', 'company', 'yearsExp', 'salary',
   'linkedin', 'github', 'website', 'coverLetter'
 ];
@@ -132,6 +132,7 @@ function bindOpenTabButton() {
 
 // ─── Theme toggle (dark / light mode) ────────────────────────────────────────
 function applyTheme(isDark) {
+  document.documentElement.classList.toggle('dark', isDark);
   document.body.classList.toggle('dark', isDark);
 }
 
@@ -139,8 +140,9 @@ function bindThemeToggle() {
   const btn = document.getElementById('theme-toggle-btn');
   if (!btn) return;
   btn.addEventListener('click', async () => {
-    const isDark = !document.body.classList.contains('dark');
+    const isDark = !document.documentElement.classList.contains('dark');
     applyTheme(isDark);
+    localStorage.setItem('jobApplyTheme', isDark ? 'dark' : 'light');
     const r = await chrome.storage.local.get('uiState');
     const uiState = r.uiState || {};
     uiState.theme = isDark ? 'dark' : 'light';
@@ -271,6 +273,19 @@ function bindProfileSave() {
   });
 }
 
+// ─── Skills helpers ───────────────────────────────────────────────────────────
+function addSkillsFromText(text) {
+  const parts = text.split(',').map(s => s.trim()).filter(Boolean);
+  let changed = false;
+  for (const skill of parts) {
+    if (skill && !profileSkills.includes(skill)) {
+      profileSkills.push(skill);
+      changed = true;
+    }
+  }
+  if (changed) renderSkills();
+}
+
 // ─── Repeatable sections ──────────────────────────────────────────────────────
 function bindRepeatable() {
   document.getElementById('add-experience').addEventListener('click', () => {
@@ -290,11 +305,16 @@ function bindRepeatable() {
   document.getElementById('skill-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      const skill = e.target.value.trim().replace(/,+$/, '');
-      if (skill && !profileSkills.includes(skill)) {
-        profileSkills.push(skill);
-        renderSkills();
-      }
+      addSkillsFromText(e.target.value);
+      e.target.value = '';
+    }
+  });
+
+  document.getElementById('skill-input').addEventListener('paste', (e) => {
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    if (pasted.includes(',')) {
+      e.preventDefault();
+      addSkillsFromText(e.target.value + pasted);
       e.target.value = '';
     }
   });
@@ -740,6 +760,7 @@ async function fillFields(profile, customRules) {
     { keywords: ['email','e-mail','email address','work email'], value: profile.email },
     { keywords: ['phone','telephone','mobile','cell','contact number','phone number','work phone'], value: profile.phone },
     { keywords: ['street address','address line 1','address line1','address 1','mailing address','home address','street'], value: profile.address },
+    { keywords: ['address line 2','address2','apt','suite','unit','apartment','floor','address line2'], value: profile.addressLine2 },
     { keywords: ['city','town','municipality'], value: profile.city },
     { keywords: ['state','province','region'], value: profile.state },
     { keywords: ['zip','postal','post code','postcode','zipcode','zip code'], value: profile.zipCode },
@@ -1019,12 +1040,85 @@ async function fillFields(profile, customRules) {
     },
   ];
 
+  // ── Find the "Add" / "Add Another" button for a repeating section ────────
+  function getSectionHeadingText(el) {
+    // Walk up ancestors (up to 8 levels) looking for a heading element
+    // that describes the section this element belongs to.
+    let node = el.parentElement;
+    for (let d = 0; d < 8 && node; d++, node = node.parentElement) {
+      // Direct child headings
+      const headings = node.querySelectorAll(
+        ':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6,' +
+        ':scope > [class*="heading"], :scope > [class*="title"], :scope > [class*="section-header"],' +
+        ':scope > legend'
+      );
+      for (const h of headings) {
+        const t = h.textContent.trim();
+        if (t) return t.toLowerCase();
+      }
+      // aria-labelledby on the ancestor
+      const labelledBy = node.getAttribute('aria-labelledby');
+      if (labelledBy) {
+        const labelEl = document.getElementById(labelledBy);
+        if (labelEl) return labelEl.textContent.trim().toLowerCase();
+      }
+    }
+    return '';
+  }
+
   function findAddButton(keywords) {
-    const btns = document.querySelectorAll('button, [role="button"], a[role="button"]');
-    return Array.from(btns).find(btn => {
+    const allBtns = document.querySelectorAll('button, [role="button"], a[role="button"]');
+
+    // Strategy 1: button text contains both "add" and a section keyword
+    const byText = Array.from(allBtns).find(btn => {
       const text = (btn.textContent || btn.getAttribute('aria-label') || '').trim().toLowerCase();
       return /\badd\b/.test(text) && keywords.some(kw => text.includes(kw));
-    }) || null;
+    });
+    if (byText) return byText;
+
+    // Strategy 2: Workday — data-automation-id="add-button" whose ancestor
+    // section heading matches one of the keywords.
+    const wdBtns = document.querySelectorAll('[data-automation-id="add-button"]');
+    for (const btn of wdBtns) {
+      const headingText = getSectionHeadingText(btn);
+      if (headingText && keywords.some(kw => headingText.includes(kw))) return btn;
+    }
+
+    // Strategy 3: generic "Add" / "Add Another" button (no keyword in its own
+    // text) whose nearest section heading matches a keyword.
+    const addOnlyBtns = Array.from(allBtns).filter(btn => {
+      const text = (btn.textContent || btn.getAttribute('aria-label') || '').trim().toLowerCase();
+      return /^\s*add(\s+another)?\s*$/i.test(text);
+    });
+    for (const btn of addOnlyBtns) {
+      const headingText = getSectionHeadingText(btn);
+      if (headingText && keywords.some(kw => headingText.includes(kw))) return btn;
+    }
+
+    return null;
+  }
+
+  // ── Find existing repeating entry groups relative to the add button ────────
+  function findExistingGroups(addBtn) {
+    // Walk up until we find a container that holds entry groups with fields.
+    let container = addBtn.parentElement;
+    for (let depth = 0; depth < 6 && container; depth++, container = container.parentElement) {
+      // Direct children that are not the button itself and contain fields
+      const byFields = Array.from(container.querySelectorAll(':scope > *')).filter(
+        c => !c.contains(addBtn) && countFields(c) >= 1
+      );
+      if (byFields.length) return { groups: byFields, container };
+
+      // Children that contain a "Delete" / "Remove" button (Workday pattern)
+      const withDelete = Array.from(container.querySelectorAll(':scope > *')).filter(c => {
+        if (c.contains(addBtn)) return false;
+        return Array.from(c.querySelectorAll('button, [role="button"]')).some(
+          b => /\bdelete\b|\bremove\b/i.test(b.textContent || b.getAttribute('aria-label') || '')
+        );
+      });
+      if (withDelete.length) return { groups: withDelete, container };
+    }
+    return { groups: [], container: addBtn.parentElement };
   }
 
   function countFields(container) {
@@ -1060,31 +1154,33 @@ async function fillFields(profile, customRules) {
     const isSkills = def.fieldMap === null;
 
     if (isSkills) {
+      // Workday skills: a multi-select combobox where you type each skill.
+      // First try to find a dedicated skills input; fall back to any visible
+      // combobox/input near the Add button.
+      const skillInputCandidates = [
+        ...document.querySelectorAll(
+          'input[data-automation-id="skills"], input[data-automation-id*="skill" i],' +
+          'input[class*="skill" i], input[id*="skill" i], input[name*="skill" i],' +
+          'input[placeholder*="skill" i]'
+        ),
+        ...Array.from(document.querySelectorAll('input[role="combobox"], input[aria-autocomplete]')).filter(
+          el => /skill/i.test(getSectionHeadingText(el))
+        ),
+      ];
+
       for (let i = 0; i < def.items.length; i++) {
-        if (i > 0) {
-          addBtn.click();
-          await new Promise(r => setTimeout(r, SKILL_ADD_DELAY));
-        }
-        const skillInputs = document.querySelectorAll(
-          'input[class*="skill" i], input[id*="skill" i], input[name*="skill" i], input[placeholder*="skill" i]'
-        );
-        const input = skillInputs.length ? skillInputs[skillInputs.length - 1] : null;
-        if (input && !input.disabled && !input.readOnly) {
+        // Pick the first visible, enabled skill input each iteration (the
+        // active tag-entry field in Workday re-renders after each selection).
+        const input = skillInputCandidates.find(
+          el => !el.disabled && !el.readOnly && el.offsetParent !== null
+        ) ?? null;
+        if (input) {
           if (await fillOne(input, def.items[i])) filledCount++;
+          await new Promise(r => setTimeout(r, SKILL_ADD_DELAY));
         }
       }
     } else {
-      const parent = addBtn.parentElement;
-      let existingGroups = Array.from(parent.children).filter(
-        c => c !== addBtn && countFields(c) >= 1
-      );
-
-      if (!existingGroups.length && addBtn.parentElement?.parentElement) {
-        const grandParent = addBtn.parentElement.parentElement;
-        existingGroups = Array.from(grandParent.children).filter(
-          c => !c.contains(addBtn) && countFields(c) >= 1
-        );
-      }
+      let { groups: existingGroups, container } = findExistingGroups(addBtn);
 
       if (existingGroups.length > 0 && def.items[0]) {
         await fillGroup(existingGroups[0], def.items[0], def.fieldMap);
@@ -1094,9 +1190,8 @@ async function fillFields(profile, customRules) {
         addBtn.click();
         await new Promise(r => setTimeout(r, REPEATING_SECTION_ADD_DELAY));
 
-        const afterGroups = Array.from(parent.children).filter(
-          c => c !== addBtn && countFields(c) >= 1
-        );
+        // Re-discover groups from the same container after the click
+        const { groups: afterGroups } = findExistingGroups(addBtn);
         if (afterGroups.length > existingGroups.length) {
           const newGroup = afterGroups[afterGroups.length - 1];
           await fillGroup(newGroup, def.items[i], def.fieldMap);
