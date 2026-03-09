@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAllAutoResize();
   bindClosePanelButton();
   bindOpenTabButton();
+  bindThemeToggle();
   setTimeout(restoreScrollPositions, 50);
   document.querySelectorAll('.tab-content').forEach(el => {
     el.addEventListener('scroll', scheduleScrollSave, { passive: true });
@@ -129,7 +130,25 @@ function bindOpenTabButton() {
   });
 }
 
-// ─── URL Validator ────────────────────────────────────────────────────────────
+// ─── Theme toggle (dark / light mode) ────────────────────────────────────────
+function applyTheme(isDark) {
+  document.body.classList.toggle('dark', isDark);
+}
+
+function bindThemeToggle() {
+  const btn = document.getElementById('theme-toggle-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const isDark = !document.body.classList.contains('dark');
+    applyTheme(isDark);
+    const r = await chrome.storage.local.get('uiState');
+    const uiState = r.uiState || {};
+    uiState.theme = isDark ? 'dark' : 'light';
+    await chrome.storage.local.set({ uiState });
+  });
+}
+
+
 function isValidUrlFormat(value) {
   if (!value) return null;
   try {
@@ -145,7 +164,7 @@ async function isUrlReachable(url) {
     // mode:'no-cors' returns an opaque response when the server replies, but throws a
     // TypeError (network/DNS error) when the domain doesn't exist — which is exactly
     // the distinction we need to detect "gibberish" domains vs real ones.
-    await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(8000) });
+    await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(5000) });
     return true;
   } catch {
     return false;
@@ -191,7 +210,7 @@ async function updateUrlStatus(fieldId) {
 
 function scheduleUrlCheck(fieldId) {
   clearTimeout(urlCheckTimers[fieldId]);
-  urlCheckTimers[fieldId] = setTimeout(() => updateUrlStatus(fieldId), 800);
+  urlCheckTimers[fieldId] = setTimeout(() => updateUrlStatus(fieldId), 500);
 }
 
 function bindUrlValidators() {
